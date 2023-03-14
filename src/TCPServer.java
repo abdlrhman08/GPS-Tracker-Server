@@ -7,16 +7,20 @@ public class TCPServer extends Thread{
     private Socket Socket = null;
     private ServerSocket Server = null;
 
-    public TCPServer(int port) {
+    private int port;
 
-        //Process may fail so its safe to throw exception
-        try {
-            Server = new ServerSocket(port);
-        }
-    } catch (IOException e) {}
+    public TCPServer(int port) {
+        this.port = port;
+    }
 
     public void run() {
+        try {
+            Server = new ServerSocket(port);
+            System.out.println("Starting TCP Server");
 
+            Socket = Server.accept();
+            System.out.println("New connection from " + Socket.getRemoteSocketAddress());
+        } catch (IOException e) {}
 
     }
 }
