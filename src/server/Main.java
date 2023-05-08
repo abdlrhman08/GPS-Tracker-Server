@@ -1,11 +1,10 @@
 package server;
 
+import java.io.IOException;
+
 public class Main {
-    public static void main(String[] args) {
-        TCPServer server = new TCPServer(2650);
-        server.start();
-        System.out.println("hmmmm");
-        
-        //HTTP Server
+    public static void main(String[] args) throws IOException {
+        Server server = new Server(1215);
+        server.listen();
     }
 }
