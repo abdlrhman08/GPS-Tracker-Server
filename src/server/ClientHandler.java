@@ -42,7 +42,7 @@ public class ClientHandler extends Thread{
                 System.out.println("Application connected, given id: " + this.ID);
                 break;
             default:
-                System.out.println("Invalid identifier sent, closing connection");
+                System.out.println("Invalid identifier sent, closing connection. Sent data: " + new String(ID));
                 try {
                     this.socket.close();
                     this.Input.close();
@@ -61,31 +61,44 @@ public class ClientHandler extends Thread{
 
             try {
                 int f = this.Input.read(mesg, 0, 4);
-                switch (new String(mesg)) {
+                String mesgStr = new String(mesg);
+                
+                if (f == -1) continue;
+                
+                
+                switch (mesgStr) {
                     case "gpsd":
                         this.Out.write('1');
                         char[] LatLong = new char[30];  // Increase size to accommodate both latitude and longitude
 
                         int n = this.Input.read(LatLong, 0, 30); 
 
-                        String[] both = new String(LatLong).split(",");  // Split values using comma as separator
+                        String[] both = new String(LatLong).trim().split(",");  // Split values using comma as separator
 
                         if (both.length == 2) {  // Ensure that both values were received
                             GpsData.Latitude = Double.parseDouble(both[0]);  // First value is latitude
                             GpsData.Longitude = Double.parseDouble(both[1]);  // Second value is longitude
                         } else {
                             System.out.println("Invalid GPS data received");
+                            break;
                         }
-
+                        
+                        System.out.println("Data received: " + new String(LatLong).trim());
                         break;
-
                     
                     case "getd":
-                        System.out.println("Current Longitude: " + GpsData.Latitude);
-
+                    	String data = Double.toString(GpsData.Latitude) + "," + Double.toString(GpsData.Longitude);
+                    	this.Out.write(data.getBytes());
+                    	
+                    	System.out.println("Current data sent: " + data);       
+                        break;
                     case "exit":
                         running = false;
                         break;
+                    default:
+                    	System.out.println("Unknown command sent: " + mesgStr);
+                    	break;
+                        
                 }
             } catch (IOException e) {
                 e.printStackTrace();
