@@ -35,6 +35,7 @@ public class ClientHandler extends Thread{
 
             case "tiva":
                 this.ID = 0;
+                GpsData.TivaConn = true;
                 System.out.println("Tiva connected, given id: " + this.ID);
                 break;
             case "appl":
@@ -63,23 +64,32 @@ public class ClientHandler extends Thread{
                 int f = this.Input.read(mesg, 0, 4);
                 String mesgStr = new String(mesg);
                 
-                if (f == -1) continue;
+                if (f == -1) {
+                	
+                	if (this.ID == 0)
+                		GpsData.TivaConn = false;
+                	else if (this.ID == 1)
+                		GpsData.firstAppConnection = true;
+                	
+                	running = false;
+                }
                 
                 
                 switch (mesgStr) {
                     case "gpsd":
-                        this.Out.write('1');
-                        char[] LatLong = new char[30];  // Increase size to accommodate both latitude and longitude
+                        char[] LatLong = new char[60];  // Increase size to accommodate both latitude and longitude
 
-                        int n = this.Input.read(LatLong, 0, 30); 
+                        int n = this.Input.read(LatLong, 0, 60); 
 
                         String[] both = new String(LatLong).trim().split(",");  // Split values using comma as separator
 
-                        if (both.length == 2) {  // Ensure that both values were received
+                        if (both.length == 4) {  // Ensure that both values were received
                             GpsData.Latitude = Double.parseDouble(both[0]);  // First value is latitude
-                            GpsData.Longitude = Double.parseDouble(both[1]);  // Second value is longitude
+                            GpsData.Longitude = Double.parseDouble(both[1]);// Second value is longitude
+                            GpsData.movedDistance = Double.parseDouble(both[2]);
+                            GpsData.Speed = Integer.parseInt(both[3]);
                         } else {
-                            System.out.println("Invalid GPS data received");
+                            System.out.println("Invalid GPS data received: " + new String(LatLong).trim());
                             break;
                         }
                         
@@ -87,13 +97,63 @@ public class ClientHandler extends Thread{
                         break;
                     
                     case "getd":
-                    	String data = Double.toString(GpsData.Latitude) + "," + Double.toString(GpsData.Longitude);
+                    	int tivaConn = 0;
+                    	
+                    	if (GpsData.TivaConn)	
+                    		tivaConn = 1;
+                    		
+                    	String data = Double.toString(GpsData.movedDistance) + "," + GpsData.Time + "," + GpsData.Speed + "," + Double.toString(GpsData.Latitude) + "," + Double.toString(GpsData.Longitude) + "," + Double.toString(GpsData.linearDistance) + "," + tivaConn;
+                    	
+                    	if (GpsData.firstAppConnection && this.ID == 1) {
+                    		data += Double.toString(GpsData.linearDistance);
+                    		GpsData.firstAppConnection = false;
+                    	}
+                    		
                     	this.Out.write(data.getBytes());
                     	
-                    	System.out.println("Current data sent: " + data);       
+                    	System.out.println("Current data sent: " + data);
                         break;
+                        
+                    case "dest":
+                    	if (this.ID == 1) {
+                    		this.Out.write('1');
+                    		char[] recvData = new char[30];
+                    		
+                    		int x = this.Input.read(recvData, 0, 30);
+                    		String[] recvLatLong = new String(recvData).trim().split(",");
+                    		
+                    		GpsData.destinationLat = Double.parseDouble(recvLatLong[0]);
+                    		GpsData.destinationLong = Double.parseDouble(recvLatLong[1]);
+                    		
+                    		System.out.println("Destination: " + new String(recvData).trim());
+                    		
+                    	} else if (this.ID == 0) {
+                    		System.out.println("Tiva is requesting destination");
+                    		char[] recvData = new char[512];
+                    		
+                    		int x = this.Input.read(recvData, 0, 30);
+                    		System.out.println("Received");
+                    		String[] recvLatLong = new String(recvData).trim().split(",");
+                    	
+                    		GpsData.StartLatitude = Double.parseDouble(recvLatLong[0]);
+                    		GpsData.StartLongitude = Double.parseDouble(recvLatLong[1]);
+                    		
+                    		while (GpsData.destinationLat == 0 || GpsData.destinationLong == 0) {
+                    			System.out.println("Waiting for application connection first");
+                    		}
+                    		
+                    		GpsData.linearDistance = GpsData.calculateDistance(GpsData.StartLatitude, GpsData.destinationLat, GpsData.StartLongitude, GpsData.destinationLong);
+                    	
+                    		System.out.println("Starting point received" + new String(recvData).trim());	
+                    		String Latitude = Double.toString(GpsData.destinationLat);
+                    		String Longitude = Double.toString(GpsData.destinationLong);
+                    		
+                    		String total = Latitude + "," + Longitude + "X";
+                    	} 
+                    	break;
                     case "exit":
                         running = false;
+                        GpsData.firstAppConnection = true;
                         break;
                     default:
                     	System.out.println("Unknown command sent: " + mesgStr);
